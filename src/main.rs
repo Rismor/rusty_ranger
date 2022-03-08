@@ -109,6 +109,30 @@ impl<'a> Default for App<'a> {
         }
     }
 }
+
+fn get_file_list(path: &str) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            if let Ok(metadata) = entry.metadata() {
+                let mut str = get_file_name(&entry);
+                if metadata.is_dir() {
+                    str.push('/');
+                    result.push(str);
+                }
+            }
+        }
+    }
+    result
+}
+
+fn get_file_name(entry: &DirEntry) -> String {
+    entry
+        .file_name()
+        .into_string()
+        .unwrap_or_else(|_| "Bad Dir".to_string())
+}
+
 fn main() {
     println!("Hello, world!");
 }
