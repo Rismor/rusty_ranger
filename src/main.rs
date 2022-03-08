@@ -96,6 +96,19 @@ struct App<'a> {
     pwd: String,
 }
 
+impl<'a> Default for App<'a> {
+    fn default() -> App<'a> {
+        App {
+            current_dir: StatefulList::with_items(Vec::new()),
+            previous_dir: StatefulList::with_items(Vec::new()),
+            next_dir: StatefulList::with_items(Vec::new()),
+            show_hidden: false,
+            current_dir_files: Vec::new(),
+            selected_item: String::new(),
+            pwd: String::new(),
+        }
+    }
+}
 fn main() {
     println!("Hello, world!");
 }
