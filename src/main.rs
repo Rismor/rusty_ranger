@@ -166,6 +166,44 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let block = Block::default().title("Block3").borders(Borders::ALL);
     f.render_widget(block, chunks[2]);
 }
+
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+    //     app.selected_item = thing.to_string();
+
+    loop {
+        terminal.draw(|f| ui(f, &mut app))?;
+        if let Event::Key(key) = event::read()? {
+            match key.code {
+                KeyCode::Char('q') => {
+                    return Ok(());
+                }
+                KeyCode::Left => app.current_dir.unselect(),
+                KeyCode::Char('h') => app.current_dir.unselect(),
+                KeyCode::Down => app.current_dir.next(),
+                KeyCode::Char('j') => app.current_dir.next(),
+                KeyCode::Up => app.current_dir.previous(),
+                KeyCode::Char('k') => app.current_dir.previous(),
+                _ => {}
+            }
+        }
+    }
+}
+
+fn init_current_dir(app: &mut App) {
+    app.current_dir = StatefulList::with_items(Vec::new());
+    for file_name in app.current_dir_files.clone() {
+        let file_is_hidden = match file_name.chars().next() {
+            Some('.') => true,
+            Some(_) => false,
+            None => false,
+        };
+
+        if !file_is_hidden || app.show_hidden {
+            app.current_dir.items.push(ListItem::new(file_name));
+        }
+    }
+}
+
 fn main() {
     println!("Hello, world!");
 }
