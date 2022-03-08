@@ -133,6 +133,39 @@ fn get_file_name(entry: &DirEntry) -> String {
         .unwrap_or_else(|_| "Bad Dir".to_string())
 }
 
+fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(1)
+        .constraints(
+            [
+                Constraint::Percentage(30),
+                Constraint::Percentage(30),
+                Constraint::Percentage(30),
+            ]
+            .as_ref(),
+        )
+        .split(f.size());
+    let items: Vec<ListItem> = Vec::new();
+    let items = &*app.current_dir.items;
+    let items = List::new(items)
+        .style(Style::default().fg(Color::White))
+        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+        .highlight_symbol(">> ");
+
+    let block = Block::default().title("Block1").borders(Borders::ALL);
+    f.render_widget(block, chunks[0]);
+    let item = app.current_dir.items.to_owned();
+    let items = List::new(item)
+        .style(Style::default().fg(Color::White))
+        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+        .highlight_symbol(">> ");
+
+    f.render_stateful_widget(items, chunks[1], &mut app.current_dir.state);
+    // f.render_widget(blockz, chunks[1]);
+    let block = Block::default().title("Block3").borders(Borders::ALL);
+    f.render_widget(block, chunks[2]);
+}
 fn main() {
     println!("Hello, world!");
 }
