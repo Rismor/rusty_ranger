@@ -81,6 +81,21 @@ impl<T> StatefulList<T> {
         self.state.select(None);
     }
 }
+
+struct App<'a> {
+    current_dir: StatefulList<ListItem<'a>>,
+    previous_dir: StatefulList<ListItem<'a>>,
+    next_dir: StatefulList<ListItem<'a>>,
+
+    /// Toggle to show hidden files or not
+    show_hidden: bool,
+
+    /// Files and Dirs in the current dir.
+    current_dir_files: Vec<String>,
+    selected_item: String,
+    pwd: String,
+}
+
 fn main() {
     println!("Hello, world!");
 }
