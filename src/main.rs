@@ -21,6 +21,19 @@ use tui::{
     Frame,
 };
 
+#[derive(Parser)]
+#[clap(name = "Rusty Ranger")]
+#[clap(author = "Morris Alromhein")]
+#[clap(version = "1.0")]
+#[clap(about = "Ranger style file explorer written in Rust")]
+struct Args {
+    #[clap(short = 'f', long, default_value_t = String::from("~/"))]
+    filename: String,
+
+    #[clap(short = 's', long)]
+    show_hidden: bool,
+}
+
 fn main() {
     println!("Hello, world!");
 }
