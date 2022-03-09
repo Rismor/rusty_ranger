@@ -142,49 +142,6 @@ fn get_file_name(entry: &DirEntry) -> String {
         .unwrap_or_else(|_| "Bad Dir".to_string())
 }
 
-// fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
-//     let mut items: Vec<ListItem> = Vec::new();
-//     for file_name in app.current_dir_files.clone() {
-//         let file_is_hidden = match file_name.chars().next() {
-//             Some('.') => true,
-//             Some(_) => false,
-//             None => false,
-//         }..;
-//         if !file_is_hidden || app.show_hidden {
-//             items.push(ListItem::new(file_name));
-//         }
-//     }
-//     let blockz = List::new(items)
-//         .block(
-//             Block::default()
-//                 .title(app.pwd.clone())
-//                 .borders(Borders::ALL),
-//         )
-//         .style(Style::default().fg(Color::White))
-//         .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
-//         .highlight_symbol(">> ");
-
-//     let chunks = Layout::default()
-//         .direction(Direction::Horizontal)
-//         .margin(1)
-//         .constraints(
-//             [
-//                 Constraint::Percentage(30),
-//                 Constraint::Percentage(30),
-//                 Constraint::Percentage(30),
-//             ]
-//             .as_ref(),
-//         )
-//         .split(f.size());
-
-//     // let prev_dir = app.pwd.
-//     let block = Block::default().title("Block1").borders(Borders::ALL);
-//     f.render_widget(block, chunks[0]);
-//     f.render_widget(blockz, chunks[1]);
-//     let block = Block::default().title("Block3").borders(Borders::ALL);
-//     f.render_widget(block, chunks[2]);
-// }
-
 fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
