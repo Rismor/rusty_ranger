@@ -95,14 +95,15 @@ impl<T> StatefulList<T> {
 
 struct App<'a> {
     current_dir: StatefulList<ListItem<'a>>,
-    previous_dir: StatefulList<ListItem<'a>>,
-    next_dir: StatefulList<ListItem<'a>>,
-
+    // previous_dir: StatefulList<ListItem<'a>>,
+    // next_dir: StatefulList<ListItem<'a>>,
     /// Toggle to show hidden files or not
     show_hidden: bool,
 
     /// Files and Dirs in the current dir.
-    current_dir_files: Vec<String>,
+    current_dir_vec_list: Vec<String>,
+    previous_dir_vec_list: Vec<String>,
+    next_dir_vec_list: Vec<String>,
 
     // Using Path Object instead of string.
     pwd: std::path::PathBuf,
@@ -112,39 +113,18 @@ impl<'a> Default for App<'a> {
     fn default() -> App<'a> {
         App {
             current_dir: StatefulList::with_items(Vec::new()),
-            previous_dir: StatefulList::with_items(Vec::new()),
-            next_dir: StatefulList::with_items(Vec::new()),
+            // previous_dir: StatefulList::with_items(Vec::new()),
+            // next_dir: StatefulList::with_items(Vec::new()),
             show_hidden: false,
-            current_dir_files: Vec::new(),
+            current_dir_vec_list: Vec::new(),
             pwd: match dirs::home_dir() {
                 Some(x) => x,
                 None => std::path::PathBuf::new(),
             },
+            previous_dir_vec_list: Vec::new(),
+            next_dir_vec_list: Vec::new(),
         }
     }
-}
-
-fn get_file_list(path: &str) -> Vec<String> {
-    let mut result: Vec<String> = Vec::new();
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            if let Ok(metadata) = entry.metadata() {
-                let mut str = get_file_name(&entry);
-                if metadata.is_dir() {
-                    str.push('/');
-                    result.push(str);
-                }
-            }
-        }
-    }
-    result
-}
-
-fn get_file_name(entry: &DirEntry) -> String {
-    entry
-        .file_name()
-        .into_string()
-        .unwrap_or_else(|_| "Bad Dir".to_string())
 }
 
 fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
@@ -160,23 +140,30 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             .as_ref(),
         )
         .split(f.size());
-    let items: Vec<ListItem> = Vec::new();
-    let items = &*app.current_dir.items;
-    let items = List::new(items)
-        .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
-        .highlight_symbol(">> ");
+
+    // let items: Vec<ListItem> = Vec::new();
+    // let items = &*app.current_dir.items;
+    // let items = List::new(items)
+    //     .style(Style::default().fg(Color::White))
+    //     .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+    //     .highlight_symbol(">> ");
+
+    // let items = List::new(&*app.current_dir.items)
+    //     .style(Style::default().fg(Color::Blue))
+    //     .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+    //     .highlight_symbol(">> ");
 
     let prev_block = Block::default().title("Block1").borders(Borders::ALL);
+    let pprev_block = Block::default().title("Block1").borders(Borders::ALL);
     f.render_widget(prev_block, chunks[0]);
-
     let item = app.current_dir.items.to_owned();
-    let curr_block = List::new(item)
+    let main_block = List::new(item)
         .style(Style::default().fg(Color::White))
+        .block(pprev_block)
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
         .highlight_symbol(">> ");
 
-    f.render_stateful_widget(curr_block, chunks[1], &mut app.current_dir.state);
+    f.render_stateful_widget(main_block, chunks[1], &mut app.current_dir.state);
     // f.render_widget(blockz, chunks[1]);
     let next_block = Block::default().title("Block3").borders(Borders::ALL);
     f.render_widget(next_block, chunks[2]);
@@ -188,12 +175,14 @@ fn main() -> Result<(), io::Error> {
 
     // app.pwd = args.filename;
     app.show_hidden = args.show_hidden;
-    // app.current_dir_files = get_file_list(&app.pwd);
-    app.current_dir_files = get_files_as_vec(&app.pwd);
+    app.current_dir_vec_list = get_files_as_vec(&app.pwd);
+
+    println!("HERE I AM {} ", app.pwd.display()); // home/morris
+    println!("HERE I AM {} ", app.pwd.parent().unwrap().display()); // home/morris
 
     // app.previous_dir_files = get_file_list();
 
-    app.current_dir_files.sort();
+    app.current_dir_vec_list.sort();
 
     init_current_dir(&mut app);
 
@@ -245,7 +234,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
 fn init_current_dir(app: &mut App) {
     app.current_dir = StatefulList::with_items(Vec::new());
 
-    for file_name in app.current_dir_files.clone() {
+    for file_name in app.current_dir_vec_list.clone() {
         let file_is_hidden = match file_name.chars().next() {
             Some('.') => true,
             Some(_) => false,
@@ -262,7 +251,7 @@ fn update(context: Context, app: &mut App) {
     init_current_dir(app);
     match context {
         Context::GoNext => {
-            app.previous_dir.items = app.current_dir.items.to_owned();
+            // app.previous_dir.items = app.current_dir.items.to_owned();
             let i = app.current_dir.state.selected().unwrap_or(0);
             let x = app.current_dir.state.select(Some(i));
             // ajkapp.selected_item = String::from(app.current_dir.items[0]);
@@ -295,6 +284,8 @@ fn get_files_as_vec(pwd: &PathBuf) -> Vec<String> {
                 if metadata.is_dir() {
                     file_name.push('/');
                     result.push(file_name);
+                } else {
+                    result.push(file_name)
                 }
             }
         }
