@@ -302,7 +302,6 @@ fn update(context: Context, app: &mut App) {
     }
 }
 
-// TODO Add showing next dir and prev dir
 //
 //
 //
@@ -329,3 +328,6 @@ fn get_files_as_vec(pwd: &Path) -> Vec<String> {
     }
     result
 }
+
+// TODO Allow user to go back a directory
+// TODO Add showing next dir
