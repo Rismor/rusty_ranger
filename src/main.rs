@@ -10,7 +10,7 @@ use crossterm::terminal::{
 };
 use std::fs::{self, metadata, DirEntry};
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::{env, thread};
 use tui::backend::CrosstermBackend;
@@ -24,6 +24,8 @@ use tui::{
     widgets::{Block, Borders},
     Frame,
 };
+
+use dirs;
 
 #[derive(Parser)]
 #[clap(name = "Rusty Ranger")]
@@ -101,8 +103,9 @@ struct App<'a> {
 
     /// Files and Dirs in the current dir.
     current_dir_files: Vec<String>,
-    selected_item: String,
-    pwd: String,
+
+    // Using Path Object instead of string.
+    pwd: std::path::PathBuf,
 }
 
 impl<'a> Default for App<'a> {
@@ -113,8 +116,10 @@ impl<'a> Default for App<'a> {
             next_dir: StatefulList::with_items(Vec::new()),
             show_hidden: false,
             current_dir_files: Vec::new(),
-            selected_item: String::new(),
-            pwd: String::new(),
+            pwd: match dirs::home_dir() {
+                Some(x) => x,
+                None => std::path::PathBuf::new(),
+            },
         }
     }
 }
@@ -162,27 +167,29 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
         .highlight_symbol(">> ");
 
-    let block = Block::default().title("Block1").borders(Borders::ALL);
-    f.render_widget(block, chunks[0]);
+    let prev_block = Block::default().title("Block1").borders(Borders::ALL);
+    f.render_widget(prev_block, chunks[0]);
+
     let item = app.current_dir.items.to_owned();
-    let items = List::new(item)
+    let curr_block = List::new(item)
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
         .highlight_symbol(">> ");
 
-    f.render_stateful_widget(items, chunks[1], &mut app.current_dir.state);
+    f.render_stateful_widget(curr_block, chunks[1], &mut app.current_dir.state);
     // f.render_widget(blockz, chunks[1]);
-    let block = Block::default().title("Block3").borders(Borders::ALL);
-    f.render_widget(block, chunks[2]);
+    let next_block = Block::default().title("Block3").borders(Borders::ALL);
+    f.render_widget(next_block, chunks[2]);
 }
 
 fn main() -> Result<(), io::Error> {
     let mut app = App::default();
     let args = Args::parse();
 
-    app.pwd = args.filename;
+    // app.pwd = args.filename;
     app.show_hidden = args.show_hidden;
-    app.current_dir_files = get_file_list(&app.pwd);
+    // app.current_dir_files = get_file_list(&app.pwd);
+    app.current_dir_files = get_files_as_vec(&app.pwd);
 
     // app.previous_dir_files = get_file_list();
 
@@ -234,8 +241,10 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
     }
 }
 
+//FIXME currently not able to get previous dir and next dir
 fn init_current_dir(app: &mut App) {
     app.current_dir = StatefulList::with_items(Vec::new());
+
     for file_name in app.current_dir_files.clone() {
         let file_is_hidden = match file_name.chars().next() {
             Some('.') => true,
@@ -265,4 +274,30 @@ fn update(context: Context, app: &mut App) {
         }
         Context::GoPrev => {}
     }
+}
+
+// TODO Add showing next dir and prev dir
+//
+//
+//
+fn get_files_as_vec(pwd: &PathBuf) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+    if let Ok(entries) = fs::read_dir(pwd) {
+        for entry in entries.flatten() {
+            if let Ok(metadata) = entry.metadata() {
+                let mut file_name = {
+                    let entry = &entry;
+                    entry
+                        .file_name()
+                        .into_string()
+                        .unwrap_or_else(|_| "Bad Dir".to_string())
+                };
+                if metadata.is_dir() {
+                    file_name.push('/');
+                    result.push(file_name);
+                }
+            }
+        }
+    }
+    result
 }
