@@ -1,3 +1,7 @@
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+#![allow(clippy::derivable_impls)]
+// #![allow(dead_code)]
 use clap::Parser;
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
 use crossterm::execute;
@@ -32,6 +36,11 @@ struct Args {
 
     #[clap(short = 's', long)]
     show_hidden: bool,
+}
+
+enum Context {
+    GoNext,
+    GoPrev,
 }
 
 struct StatefulList<T> {
@@ -133,6 +142,49 @@ fn get_file_name(entry: &DirEntry) -> String {
         .unwrap_or_else(|_| "Bad Dir".to_string())
 }
 
+// fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+//     let mut items: Vec<ListItem> = Vec::new();
+//     for file_name in app.current_dir_files.clone() {
+//         let file_is_hidden = match file_name.chars().next() {
+//             Some('.') => true,
+//             Some(_) => false,
+//             None => false,
+//         }..;
+//         if !file_is_hidden || app.show_hidden {
+//             items.push(ListItem::new(file_name));
+//         }
+//     }
+//     let blockz = List::new(items)
+//         .block(
+//             Block::default()
+//                 .title(app.pwd.clone())
+//                 .borders(Borders::ALL),
+//         )
+//         .style(Style::default().fg(Color::White))
+//         .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+//         .highlight_symbol(">> ");
+
+//     let chunks = Layout::default()
+//         .direction(Direction::Horizontal)
+//         .margin(1)
+//         .constraints(
+//             [
+//                 Constraint::Percentage(30),
+//                 Constraint::Percentage(30),
+//                 Constraint::Percentage(30),
+//             ]
+//             .as_ref(),
+//         )
+//         .split(f.size());
+
+//     // let prev_dir = app.pwd.
+//     let block = Block::default().title("Block1").borders(Borders::ALL);
+//     f.render_widget(block, chunks[0]);
+//     f.render_widget(blockz, chunks[1]);
+//     let block = Block::default().title("Block3").borders(Borders::ALL);
+//     f.render_widget(block, chunks[2]);
+// }
+
 fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -165,6 +217,42 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     // f.render_widget(blockz, chunks[1]);
     let block = Block::default().title("Block3").borders(Borders::ALL);
     f.render_widget(block, chunks[2]);
+}
+
+fn main() -> Result<(), io::Error> {
+    let mut app = App::default();
+    let args = Args::parse();
+
+    app.pwd = args.filename;
+    app.show_hidden = args.show_hidden;
+    app.current_dir_files = get_file_list(&app.pwd);
+
+    // app.previous_dir_files = get_file_list();
+
+    app.current_dir_files.sort();
+
+    init_current_dir(&mut app);
+
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let res = run_app(&mut terminal, app);
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    if let Err(err) = res {
+        println!("{:?}", err)
+    }
+
+    Ok(())
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
@@ -204,6 +292,20 @@ fn init_current_dir(app: &mut App) {
     }
 }
 
-fn main() {
-    println!("Hello, world!");
+fn update(context: Context, app: &mut App) {
+    init_current_dir(app);
+    match context {
+        Context::GoNext => {
+            app.previous_dir.items = app.current_dir.items.to_owned();
+            let i = app.current_dir.state.selected().unwrap_or(0);
+            let x = app.current_dir.state.select(Some(i));
+            // ajkapp.selected_item = String::from(app.current_dir.items[0]);
+            // if let Some(thing) = app.current_dir.state.select(i) {
+            //     app.selected_item = thing
+            // }
+
+            init_current_dir(app);
+        }
+        Context::GoPrev => {}
+    }
 }
