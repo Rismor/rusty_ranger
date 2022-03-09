@@ -14,9 +14,10 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::{env, thread};
 use tui::backend::CrosstermBackend;
+use tui::layout::Rect;
 use tui::style::{Color, Modifier, Style};
 use tui::symbols::line::THICK_CROSS;
-use tui::widgets::{List, ListItem, ListState};
+use tui::widgets::{List, ListItem, ListState, Sparkline};
 use tui::Terminal;
 use tui::{
     backend::Backend,
@@ -95,7 +96,7 @@ impl<T> StatefulList<T> {
 
 struct App<'a> {
     current_dir: StatefulList<ListItem<'a>>,
-    // previous_dir: StatefulList<ListItem<'a>>,
+    previous_dir: StatefulList<ListItem<'a>>,
     // next_dir: StatefulList<ListItem<'a>>,
     /// Toggle to show hidden files or not
     show_hidden: bool,
@@ -113,7 +114,7 @@ impl<'a> Default for App<'a> {
     fn default() -> App<'a> {
         App {
             current_dir: StatefulList::with_items(Vec::new()),
-            // previous_dir: StatefulList::with_items(Vec::new()),
+            previous_dir: StatefulList::with_items(Vec::new()),
             // next_dir: StatefulList::with_items(Vec::new()),
             show_hidden: false,
             current_dir_vec_list: Vec::new(),
@@ -130,12 +131,13 @@ impl<'a> Default for App<'a> {
 fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .margin(1)
+        // .margin(0)
+        .vertical_margin(1)
         .constraints(
             [
-                Constraint::Percentage(30),
-                Constraint::Percentage(30),
-                Constraint::Percentage(30),
+                Constraint::Percentage(20),
+                Constraint::Percentage(33),
+                Constraint::Percentage(45),
             ]
             .as_ref(),
         )
@@ -153,19 +155,43 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     //     .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
     //     .highlight_symbol(">> ");
 
-    let prev_block = Block::default().title("Block1").borders(Borders::ALL);
-    let pprev_block = Block::default().title("Block1").borders(Borders::ALL);
+    let item = app.previous_dir.items.to_owned();
+    let prev_block = List::new(item)
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().borders(Borders::ALL));
     f.render_widget(prev_block, chunks[0]);
+
+    let title_block = Block::default();
+    let title_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(0)
+        .constraints(
+            [
+                Constraint::Percentage(3),
+                Constraint::Percentage(33),
+                Constraint::Percentage(45),
+            ]
+            .as_ref(),
+        )
+        .split(f.size());
+
     let item = app.current_dir.items.to_owned();
     let main_block = List::new(item)
         .style(Style::default().fg(Color::White))
-        .block(pprev_block)
+        .block(Block::default().borders(Borders::ALL))
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
         .highlight_symbol(">> ");
 
     f.render_stateful_widget(main_block, chunks[1], &mut app.current_dir.state);
     // f.render_widget(blockz, chunks[1]);
-    let next_block = Block::default().title("Block3").borders(Borders::ALL);
+    let next_block = Block::default().borders(Borders::ALL);
+    let testing_block = Block::default()
+        .title(app.pwd.display().to_string())
+        // .borders(Borders::BOTTOM)
+        .title_style(Style::default().fg(Color::Cyan));
+
+    f.render_widget(testing_block, title_layout[0]);
+
     f.render_widget(next_block, chunks[2]);
 }
 
@@ -174,11 +200,10 @@ fn main() -> Result<(), io::Error> {
     let args = Args::parse();
 
     // app.pwd = args.filename;
+    app.pwd.push(args.filename);
     app.show_hidden = args.show_hidden;
     app.current_dir_vec_list = get_files_as_vec(&app.pwd);
-
-    println!("HERE I AM {} ", app.pwd.display()); // home/morris
-    println!("HERE I AM {} ", app.pwd.parent().unwrap().display()); // home/morris
+    app.previous_dir_vec_list = get_files_as_vec(app.pwd.parent().unwrap());
 
     // app.previous_dir_files = get_file_list();
 
@@ -245,6 +270,18 @@ fn init_current_dir(app: &mut App) {
             app.current_dir.items.push(ListItem::new(file_name));
         }
     }
+    app.previous_dir = StatefulList::with_items(Vec::new());
+    for file_name in app.previous_dir_vec_list.clone() {
+        let file_is_hidden = match file_name.chars().next() {
+            Some('.') => true,
+            Some(_) => false,
+            None => false,
+        };
+
+        if !file_is_hidden || app.show_hidden {
+            app.previous_dir.items.push(ListItem::new(file_name));
+        }
+    }
 }
 
 fn update(context: Context, app: &mut App) {
@@ -269,7 +306,7 @@ fn update(context: Context, app: &mut App) {
 //
 //
 //
-fn get_files_as_vec(pwd: &PathBuf) -> Vec<String> {
+fn get_files_as_vec(pwd: &Path) -> Vec<String> {
     let mut result: Vec<String> = Vec::new();
     if let Ok(entries) = fs::read_dir(pwd) {
         for entry in entries.flatten() {
