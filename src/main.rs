@@ -331,3 +331,6 @@ fn get_files_as_vec(pwd: &Path) -> Vec<String> {
 
 // TODO Allow user to go back a directory
 // TODO Add showing next dir
+// TODO User specified dir to open? Open that dir : open home dir
+// TODO System Calls... delete copy paste rename ..
+// TODO Split this file into multiple files
