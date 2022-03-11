@@ -41,89 +41,160 @@ struct Args {
     show_hidden: bool,
 }
 
-enum Context {
-    GoNext,
-    GoPrev,
-}
-
-struct StatefulList<T> {
-    state: ListState,
-    items: Vec<T>,
-}
-
-impl<T> StatefulList<T> {
-    fn with_items(items: Vec<T>) -> StatefulList<T> {
-        StatefulList {
-            state: ListState::default(),
-            items,
-        }
-    }
-
-    fn next(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                // Wrap to beginning of list
-                if i >= self.items.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-    }
-
-    fn previous(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                // Wrap to end of list
-                if i == 0 {
-                    self.items.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-    }
-
-    fn unselect(&mut self) {
-        self.state.select(None);
-    }
-}
-
 struct App<'a> {
-    current_dir: StatefulList<ListItem<'a>>,
-    previous_dir: StatefulList<ListItem<'a>>,
-    // next_dir: StatefulList<ListItem<'a>>,
-    /// Toggle to show hidden files or not
+    /// Basic items.
     show_hidden: bool,
+    hovered_item: String,
+    hovered_index: i32,
 
-    /// Files and Dirs in the current dir.
-    current_dir_vec_list: Vec<String>,
-    previous_dir_vec_list: Vec<String>,
-    next_dir_vec_list: Vec<String>,
+    /// Files in the Dirs
+    current_dir_vec: Vec<String<'a>>,
+    previous_dir_vec: Vec<String>,
+    next_dir_vec: Vec<String>,
 
-    // Using Path Object instead of string.
+    /// Using PathBuff object to grab files
     pwd: std::path::PathBuf,
 }
 
-impl<'a> Default for App<'a> {
-    fn default() -> App<'a> {
+impl Default for App<'a> {
+    fn default() -> App {
         App {
-            current_dir: StatefulList::with_items(Vec::new()),
-            previous_dir: StatefulList::with_items(Vec::new()),
-            // next_dir: StatefulList::with_items(Vec::new()),
             show_hidden: false,
-            current_dir_vec_list: Vec::new(),
+            hovered_item: String::new(),
+            hovered_index: 0,
             pwd: match dirs::home_dir() {
                 Some(x) => x,
                 None => std::path::PathBuf::new(),
             },
-            previous_dir_vec_list: Vec::new(),
-            next_dir_vec_list: Vec::new(),
+            current_dir_vec: Vec::new(),
+            previous_dir_vec: Vec::new(),
+            next_dir_vec: Vec::new(),
+        }
+    }
+}
+
+impl App {
+    fn get_files_as_vec(&mut self, pwd: &Path) -> Vec<String> {
+        let mut result: Vec<String> = Vec::new();
+        if let Ok(entries) = fs::read_dir(pwd) {
+            for entry in entries.flatten() {
+                if let Ok(metadata) = entry.metadata() {
+                    let mut file_name = {
+                        let entry = &entry;
+                        entry
+                            .file_name()
+                            .into_string()
+                            .unwrap_or_else(|_| "Bad Dir".to_string())
+                    };
+                    if metadata.is_dir() {
+                        file_name.push('/');
+                        result.push(file_name);
+                    } else {
+                        result.push(file_name)
+                    }
+                }
+            }
+        }
+        self.hovered_item = result[0];
+        result
+    }
+
+    fn previous(&mut self) {
+        let i = self.hovered_index;
+        i = (i - 1).rem_euclid(self.current_dir_vec.len() as i32);
+        self.hovered_item.pop();
+        self.hovered_item.pop();
+        self.hovered_item.pop();
+        self.get_selected();
+        self.hovered_item.push(' ');
+        self.hovered_item.push('-');
+        self.hovered_item.push('>');
+    }
+
+    fn next(&mut self) {
+        let i = self.hovered_index;
+        i = (i + 1).rem_euclid(self.current_dir_vec.len() as i32);
+        self.hovered_item.pop();
+        self.hovered_item.pop();
+        self.hovered_item.pop();
+        self.get_selected();
+        self.hovered_item.push(' ');
+        self.hovered_item.push('-');
+        self.hovered_item.push('>');
+    }
+
+    fn get_selected(&mut self) {
+        self.hovered_item = self.current_dir_vec[self.hovered_index as usize]
+    }
+}
+
+fn main() -> Result<(), io::Error> {
+    let mut app = App::default();
+    let args = Args::parse();
+
+    app.pwd.push(args.filename);
+    app.show_hidden = args.show_hidden;
+
+    let child_dir = Path::new(&app.current_dir_vec[0]);
+    let parent_dir = match app.pwd.parent() {
+        Some(p) => p,
+        None => Path::new("/"),
+    };
+
+    app.current_dir_vec = app.get_files_as_vec(&app.pwd);
+    if app.pwd.ends_with("/") {
+        app.next_dir_vec = app.get_files_as_vec(child_dir);
+    } else {
+        app.next_dir_vec = vec!["".to_string()]
+    }
+    if parent_dir.has_root() {
+        app.previous_dir_vec = app.get_files_as_vec(parent_dir);
+    } else {
+        app.previous_dir_vec = vec!["".to_string()]
+    }
+
+    app.current_dir_vec.sort();
+    app.next_dir_vec.sort();
+    app.previous_dir_vec.sort();
+
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let res = run_app(&mut terminal, app);
+
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+    if let Err(err) = res {
+        println!("{:?}", err)
+    }
+
+    Ok(())
+}
+
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+    //     app.selected_item = thing.to_string();
+
+    loop {
+        terminal.draw(|f| ui(f, &mut app))?;
+        if let Event::Key(key) = event::read()? {
+            match key.code {
+                KeyCode::Char('q') => {
+                    return Ok(());
+                }
+                KeyCode::Down => app.next(),
+                KeyCode::Char('j') => app.next(),
+                KeyCode::Up => app.previous(),
+                KeyCode::Char('k') => app.previous(),
+                _ => {}
+            }
         }
     }
 }
@@ -143,25 +214,6 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .split(f.size());
 
-    // let items: Vec<ListItem> = Vec::new();
-    // let items = &*app.current_dir.items;
-    // let items = List::new(items)
-    //     .style(Style::default().fg(Color::White))
-    //     .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
-    //     .highlight_symbol(">> ");
-
-    // let items = List::new(&*app.current_dir.items)
-    //     .style(Style::default().fg(Color::Blue))
-    //     .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
-    //     .highlight_symbol(">> ");
-
-    let item = app.previous_dir.items.to_owned();
-    let prev_block = List::new(item)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::ALL));
-    f.render_widget(prev_block, chunks[0]);
-
-    let title_block = Block::default();
     let title_layout = Layout::default()
         .direction(Direction::Vertical)
         .margin(0)
@@ -175,8 +227,21 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .split(f.size());
 
-    let item = app.current_dir.items.to_owned();
-    let main_block = List::new(item)
+    let title_block = Block::default()
+        .title(app.pwd.display().to_string())
+        // .borders(Borders::BOTTOM)
+        .title_style(Style::default().fg(Color::Cyan));
+
+    f.render_widget(title_block, title_layout[0]);
+
+    // let item = app.previous_dir.items.to_owned();
+    // let prev_block = List::new(item)
+    //     .style(Style::default().fg(Color::White))
+    //     .block(Block::default().borders(Borders::ALL));
+    // f.render_widget(prev_block, chunks[0]);
+
+    //FIXME WE cannot pass this vector into TUI LIST because of its lifetime is not good.
+    let main_block = List::new(&app.current_dir_vec)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::ALL))
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
@@ -185,122 +250,38 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_stateful_widget(main_block, chunks[1], &mut app.current_dir.state);
     // f.render_widget(blockz, chunks[1]);
     let next_block = Block::default().borders(Borders::ALL);
-    let testing_block = Block::default()
-        .title(app.pwd.display().to_string())
-        // .borders(Borders::BOTTOM)
-        .title_style(Style::default().fg(Color::Cyan));
-
-    f.render_widget(testing_block, title_layout[0]);
 
     f.render_widget(next_block, chunks[2]);
 }
 
-fn main() -> Result<(), io::Error> {
-    let mut app = App::default();
-    let args = Args::parse();
-
-    // app.pwd = args.filename;
-    app.pwd.push(args.filename);
-    app.show_hidden = args.show_hidden;
-    app.current_dir_vec_list = get_files_as_vec(&app.pwd);
-    app.previous_dir_vec_list = get_files_as_vec(app.pwd.parent().unwrap());
-
-    // app.previous_dir_files = get_file_list();
-
-    app.current_dir_vec_list.sort();
-
-    init_current_dir(&mut app);
-
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let res = run_app(&mut terminal, app);
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    if let Err(err) = res {
-        println!("{:?}", err)
-    }
-
-    Ok(())
-}
-
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
-    //     app.selected_item = thing.to_string();
-
-    loop {
-        terminal.draw(|f| ui(f, &mut app))?;
-        if let Event::Key(key) = event::read()? {
-            match key.code {
-                KeyCode::Char('q') => {
-                    return Ok(());
-                }
-                KeyCode::Left => app.current_dir.unselect(),
-                KeyCode::Char('h') => app.current_dir.unselect(),
-                KeyCode::Down => app.current_dir.next(),
-                KeyCode::Char('j') => app.current_dir.next(),
-                KeyCode::Up => app.current_dir.previous(),
-                KeyCode::Char('k') => app.current_dir.previous(),
-                _ => {}
-            }
-        }
-    }
-}
-
 //FIXME currently not able to get previous dir and next dir
-fn init_current_dir(app: &mut App) {
-    app.current_dir = StatefulList::with_items(Vec::new());
+// fn init_current_dir(app: &mut App) {
+//     app.current_dir = StatefulList::with_items(Vec::new());
 
-    for file_name in app.current_dir_vec_list.clone() {
-        let file_is_hidden = match file_name.chars().next() {
-            Some('.') => true,
-            Some(_) => false,
-            None => false,
-        };
+//     for file_name in app.current_dir_vec_list.clone() {
+//         let file_is_hidden = match file_name.chars().next() {
+//             Some('.') => true,
+//             Some(_) => false,
+//             None => false,
+//         };
 
-        if !file_is_hidden || app.show_hidden {
-            app.current_dir.items.push(ListItem::new(file_name));
-        }
-    }
-    app.previous_dir = StatefulList::with_items(Vec::new());
-    for file_name in app.previous_dir_vec_list.clone() {
-        let file_is_hidden = match file_name.chars().next() {
-            Some('.') => true,
-            Some(_) => false,
-            None => false,
-        };
+//         if !file_is_hidden || app.show_hidden {
+//             app.current_dir.items.push(ListItem::new(file_name));
+//         }
+//     }
+// app.previous_dir = StatefulList::with_items(Vec::new());
+// for file_name in app.previous_dir_vec_list.clone() {
+//     let file_is_hidden = match file_name.chars().next() {
+//         Some('.') => true,
+//         Some(_) => false,
+//         None => false,
+//     };
 
-        if !file_is_hidden || app.show_hidden {
-            app.previous_dir.items.push(ListItem::new(file_name));
-        }
-    }
-}
-
-fn update(context: Context, app: &mut App) {
-    init_current_dir(app);
-    match context {
-        Context::GoNext => {
-            // app.previous_dir.items = app.current_dir.items.to_owned();
-            let i = app.current_dir.state.selected().unwrap_or(0);
-            let x = app.current_dir.state.select(Some(i));
-            // ajkapp.selected_item = String::from(app.current_dir.items[0]);
-            // if let Some(thing) = app.current_dir.state.select(i) {
-            //     app.selected_item = thing
-            // }
-
-            init_current_dir(app);
-        }
-        Context::GoPrev => {}
-    }
-}
+//     if !file_is_hidden || app.show_hidden {
+//         app.previous_dir.items.push(ListItem::new(file_name));
+//     }
+// }
+// }
 
 //
 //
