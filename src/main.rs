@@ -162,6 +162,7 @@ impl App {
         self.current_dir_vec[self.hovered_index as usize].pop();
         self.current_dir_vec[self.hovered_index as usize].pop();
         pp.push(self.current_dir_vec[self.hovered_index as usize].clone());
+        self.pwd = pp.clone();
         self.current_dir_vec = Vec::new();
         self.current_dir_vec = self.get_files_as_vec(&pp);
         self.hovered_index = 0;
