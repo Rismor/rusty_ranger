@@ -9,6 +9,7 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
+use std::fs::read_to_string;
 use std::fs::{self, metadata, DirEntry};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -242,6 +243,9 @@ impl App<'_> {
                 self.next_dir_vec = self.get_files_as_vec(&t);
             } else {
                 self.next_dir_vec = Vec::new();
+
+                let data = fs::read_to_string(t).unwrap_or("Error Loading File".to_string());
+                self.next_dir_vec.push(data);
                 //TODO IMPLEMENT FILE PREVIEW
             }
         }
