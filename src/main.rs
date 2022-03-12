@@ -35,6 +35,7 @@ use dirs;
 #[clap(version = "1.0")]
 #[clap(about = "Ranger style file explorer written in Rust")]
 struct Args {
+    #[clap(short = 'f', long)]
     filename: Option<String>,
 
     #[clap(short = 's', long)]
@@ -192,6 +193,9 @@ impl App<'_> {
         self.pwd = pp.clone();
         self.current_dir_vec = Vec::new();
         self.current_dir_vec = self.get_files_as_vec(&pp);
+        if self.current_dir_vec.len() == 0 {
+            self.current_dir_vec.push("Empty Dir...".to_string());
+        }
         self.hovered_index = 0;
         self.current_dir_vec.sort();
         self.previous_dir_vec.sort();
@@ -209,10 +213,15 @@ impl App<'_> {
         self.current_dir_vec.sort();
         self.previous_dir_vec.sort();
         self.next_dir_vec.sort();
-        self.pwd.pop();
+        let x = self.pwd.pop();
         let mut pwd = self.pwd.clone();
-        pwd.pop();
-        self.previous_dir_vec = self.get_files_as_vec(&pwd);
+        if x {
+            pwd.pop();
+            self.previous_dir_vec = self.get_files_as_vec(&pwd);
+        } else {
+            self.previous_dir_vec = Vec::new();
+        }
+        self.hovered_index = 0;
         self.update_list();
     }
 
@@ -326,7 +335,15 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                     app.previous();
                     app.hover();
                 }
-                KeyCode::Char('l') => app.into_dir(),
+                KeyCode::Char('l') => {
+                    let mut pp = app.pwd.clone();
+                    pp.push(Path::new(&app.current_dir_vec[app.hovered_index as usize]));
+                    if let Ok(metadata) = pp.metadata() {
+                        if metadata.is_dir() {
+                            app.into_dir();
+                        }
+                    }
+                }
                 KeyCode::Char('h') => app.out_dir(),
                 KeyCode::Char('s') => {
                     app.show_hidden = !app.show_hidden;
@@ -334,7 +351,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                     app.current_dir_vec = app.get_files_as_vec(&pp);
                     app.current_dir_vec.sort();
                     app.update_list();
-                    app.previous_dir_vec = app.get_files_as_vec(pp.parent().unwrap());
+                    app.previous_dir_vec =
+                        app.get_files_as_vec(pp.parent().unwrap_or(&PathBuf::new()));
                     app.hover();
                     continue;
                 }
@@ -442,6 +460,6 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(next_block, chunks[2]);
 }
 
-// TODO User specified dir to open? Open that dir : open home dir
 // TODO System Calls... delete copy paste rename ..
+// TODO Add file metadata to bottom drwxr-xr-x and bunch more stuff
 // TODO Split this file into multiple files
