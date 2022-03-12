@@ -42,6 +42,20 @@ struct Args {
     show_hidden: bool,
 }
 
+struct StatefulList<T> {
+    state: ListState,
+    items: Vec<T>,
+}
+
+impl<T> StatefulList<T> {
+    fn with_items(items: Vec<T>) -> StatefulList<T> {
+        StatefulList {
+            state: ListState::default(),
+            items,
+        }
+    }
+}
+
 struct App {
     /// Basic items.
     show_hidden: bool,
@@ -85,11 +99,20 @@ impl App {
                             .into_string()
                             .unwrap_or_else(|_| "Bad Dir".to_string())
                     };
-                    if metadata.is_dir() {
-                        file_name.push('/');
-                        result.push(file_name);
+                    let file_is_hidden = match file_name.chars().next() {
+                        Some('.') => true,
+                        Some(_) => false,
+                        None => false,
+                    };
+                    if !file_is_hidden || self.show_hidden {
+                        if metadata.is_dir() {
+                            file_name.push('/');
+                            result.push(file_name);
+                        } else {
+                            result.push(file_name)
+                        }
                     } else {
-                        result.push(file_name)
+                        continue;
                     }
                 }
             }
@@ -123,6 +146,23 @@ impl App {
         self.current_dir_vec[self.hovered_index as usize].push(' ');
         self.current_dir_vec[self.hovered_index as usize].push('-');
         self.current_dir_vec[self.hovered_index as usize].push('>');
+    }
+
+    fn into_dir(&mut self) {
+        self.previous_dir_vec = Vec::new();
+        let mut pp = self.pwd.clone();
+        self.previous_dir_vec = self.get_files_as_vec(&pp);
+        self.current_dir_vec[self.hovered_index as usize].pop();
+        self.current_dir_vec[self.hovered_index as usize].pop();
+        self.current_dir_vec[self.hovered_index as usize].pop();
+        pp.push(self.current_dir_vec[self.hovered_index as usize].clone());
+        self.current_dir_vec = Vec::new();
+        self.current_dir_vec = self.get_files_as_vec(&pp);
+        self.hovered_index = 0;
+        self.next_dir_vec = vec![
+            self.pwd.to_str().unwrap().to_string(),
+            pp.to_str().unwrap().to_string(),
+        ]
     }
 }
 
@@ -203,6 +243,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                 KeyCode::Char('j') => app.next(),
                 KeyCode::Up => app.previous(),
                 KeyCode::Char('k') => app.previous(),
+                KeyCode::Char('l') => app.into_dir(),
                 _ => {}
             }
         }
@@ -298,4 +339,6 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 // TODO User specified dir to open? Open that dir : open home dir
 // TODO System Calls... delete copy paste rename ..
 // TODO Split this file into multiple files
-// TODO
+// TODO only show shown items in current_dir
+//  Create new vec?
+//Handle scrolling first
