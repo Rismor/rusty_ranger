@@ -226,6 +226,7 @@ impl App<'_> {
             if metadata.is_dir() {
                 self.next_dir_vec = self.get_files_as_vec(&t);
             } else {
+                self.next_dir_vec = Vec::new();
                 //TODO IMPLEMENT FILE PREVIEW
             }
         }
