@@ -121,6 +121,9 @@ impl App {
     }
 
     fn previous(&mut self) {
+        if self.current_dir_vec.len() == 0 {
+            return;
+        }
         let str = &self.current_dir_vec[self.hovered_index as usize];
         let str = str.as_bytes();
         if str[str.len() - 1] as char == '>' {
@@ -135,6 +138,9 @@ impl App {
     }
 
     fn next(&mut self) {
+        if self.current_dir_vec.len() == 0 {
+            return;
+        }
         let str = &self.current_dir_vec[self.hovered_index as usize];
         let str = str.as_bytes();
         if str[str.len() - 1] as char == '>' {
