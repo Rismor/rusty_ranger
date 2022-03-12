@@ -417,7 +417,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let main_block = List::new(items)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::ALL))
-        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+        .highlight_style(Style::default())
         .highlight_symbol(">> ");
     f.render_stateful_widget(main_block, chunks[1], &mut app.current_dir_list.state);
 
