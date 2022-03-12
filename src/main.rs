@@ -226,6 +226,13 @@ impl App<'_> {
     }
 
     fn hover(&mut self) {
+        let p = match self.pwd.parent() {
+            Some(_) => true,
+            None => false,
+        };
+        if !p {
+            self.previous_dir_vec = Vec::new();
+        }
         let mut t = PathBuf::new();
         t.push(&self.pwd);
         t.push(&self.current_dir_vec[self.hovered_index as usize]);
@@ -344,7 +351,16 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                         }
                     }
                 }
-                KeyCode::Char('h') => app.out_dir(),
+                KeyCode::Char('h') => {
+                    let p = match app.pwd.parent() {
+                        Some(_) => true,
+                        None => false,
+                    };
+                    if p {
+                        app.out_dir();
+                    } else {
+                    }
+                }
                 KeyCode::Char('s') => {
                     app.show_hidden = !app.show_hidden;
                     let pp = app.pwd.clone();
