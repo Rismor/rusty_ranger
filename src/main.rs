@@ -321,6 +321,16 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                 }
                 KeyCode::Char('l') => app.into_dir(),
                 KeyCode::Char('h') => app.out_dir(),
+                KeyCode::Char('s') => {
+                    app.show_hidden = !app.show_hidden;
+                    let pp = app.pwd.clone();
+                    app.current_dir_vec = app.get_files_as_vec(&pp);
+                    app.current_dir_vec.sort();
+                    app.update_list();
+                    app.previous_dir_vec = app.get_files_as_vec(pp.parent().unwrap());
+                    app.hover();
+                    continue;
+                }
                 _ => {}
             }
         }
@@ -425,10 +435,6 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(next_block, chunks[2]);
 }
 
-// TODO Allow user to go back a directory
-// TODO Add showing next dir
 // TODO User specified dir to open? Open that dir : open home dir
 // TODO System Calls... delete copy paste rename ..
 // TODO Split this file into multiple files
-// TODO only show shown items in current_dir
-//
