@@ -35,8 +35,7 @@ use dirs;
 #[clap(version = "1.0")]
 #[clap(about = "Ranger style file explorer written in Rust")]
 struct Args {
-    #[clap(short = 'f', long, default_value_t = String::from("~/"))]
-    filename: String,
+    filename: Option<String>,
 
     #[clap(short = 's', long)]
     show_hidden: bool,
@@ -237,7 +236,15 @@ fn main() -> Result<(), io::Error> {
     let mut app = App::default();
     let args = Args::parse();
 
-    app.pwd.push(args.filename);
+    let custom_dir = match args.filename.clone() {
+        Some(p) => true,
+        None => false,
+    };
+    if custom_dir {
+        app.pwd.push(args.filename.unwrap());
+    } else {
+        app.pwd = dirs::home_dir().unwrap();
+    }
     app.show_hidden = args.show_hidden;
 
     // let child_dir = Path::new(&app.current_dir_vec[0]);
