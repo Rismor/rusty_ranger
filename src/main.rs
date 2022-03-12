@@ -54,9 +54,42 @@ impl<T> StatefulList<T> {
             items,
         }
     }
-}
 
-struct App {
+    fn next(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                // Wrap to beginning of list
+                if i >= self.items.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
+
+    fn previous(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                // Wrap to end of list
+                if i == 0 {
+                    self.items.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
+
+    fn unselect(&mut self) {
+        self.state.select(None);
+    }
+}
+struct App<'a> {
     /// Basic items.
     show_hidden: bool,
     hovered_index: i32,
@@ -68,11 +101,14 @@ struct App {
 
     /// Using PathBuff object to grab files
     pwd: std::path::PathBuf,
+
+    current_dir_list: StatefulList<ListItem<'a>>,
 }
 
-impl Default for App {
-    fn default() -> App {
+impl<'a> Default for App<'a> {
+    fn default() -> App<'a> {
         App {
+            current_dir_list: StatefulList::with_items(Vec::new()),
             show_hidden: false,
             hovered_index: 0,
             pwd: match dirs::home_dir() {
@@ -86,7 +122,22 @@ impl Default for App {
     }
 }
 
-impl App {
+impl App<'_> {
+    fn update_list(&mut self) {
+        self.current_dir_list = StatefulList::with_items(Vec::new());
+        for file_name in self.current_dir_vec.clone() {
+            let file_is_hidden = match file_name.chars().next() {
+                Some('.') => true,
+                Some(_) => false,
+                None => false,
+            };
+
+            if !file_is_hidden || self.show_hidden {
+                self.current_dir_list.items.push(ListItem::new(file_name));
+            }
+            self.current_dir_list.state.select(Some(0));
+        }
+    }
     fn get_files_as_vec(&mut self, pwd: &Path) -> Vec<String> {
         let mut result: Vec<String> = Vec::new();
         if let Ok(entries) = fs::read_dir(pwd) {
@@ -124,52 +175,60 @@ impl App {
         if self.current_dir_vec.len() == 0 {
             return;
         }
-        let str = &self.current_dir_vec[self.hovered_index as usize];
-        let str = str.as_bytes();
-        if str[str.len() - 1] as char == '>' {
-            self.current_dir_vec[self.hovered_index as usize].pop();
-            self.current_dir_vec[self.hovered_index as usize].pop();
-            self.current_dir_vec[self.hovered_index as usize].pop();
-        }
         self.hovered_index = (self.hovered_index - 1).rem_euclid(self.current_dir_vec.len() as i32);
-        self.current_dir_vec[self.hovered_index as usize].push(' ');
-        self.current_dir_vec[self.hovered_index as usize].push('-');
-        self.current_dir_vec[self.hovered_index as usize].push('>');
     }
 
     fn next(&mut self) {
         if self.current_dir_vec.len() == 0 {
             return;
         }
-        let str = &self.current_dir_vec[self.hovered_index as usize];
-        let str = str.as_bytes();
-        if str[str.len() - 1] as char == '>' {
-            self.current_dir_vec[self.hovered_index as usize].pop();
-            self.current_dir_vec[self.hovered_index as usize].pop();
-            self.current_dir_vec[self.hovered_index as usize].pop();
-        }
         self.hovered_index = (self.hovered_index + 1).rem_euclid(self.current_dir_vec.len() as i32);
-        self.current_dir_vec[self.hovered_index as usize].push(' ');
-        self.current_dir_vec[self.hovered_index as usize].push('-');
-        self.current_dir_vec[self.hovered_index as usize].push('>');
     }
 
     fn into_dir(&mut self) {
         self.previous_dir_vec = Vec::new();
         let mut pp = self.pwd.clone();
         self.previous_dir_vec = self.get_files_as_vec(&pp);
-        self.current_dir_vec[self.hovered_index as usize].pop();
-        self.current_dir_vec[self.hovered_index as usize].pop();
-        self.current_dir_vec[self.hovered_index as usize].pop();
         pp.push(self.current_dir_vec[self.hovered_index as usize].clone());
         self.pwd = pp.clone();
         self.current_dir_vec = Vec::new();
         self.current_dir_vec = self.get_files_as_vec(&pp);
         self.hovered_index = 0;
-        self.next_dir_vec = vec![
-            self.pwd.to_str().unwrap().to_string(),
-            pp.to_str().unwrap().to_string(),
-        ]
+        self.current_dir_vec.sort();
+        self.previous_dir_vec.sort();
+        self.next_dir_vec.sort();
+        self.update_list();
+        // self.next_dir_vec = vec![
+        //     self.pwd.to_str().unwrap().to_string(),
+        //     pp.to_str().unwrap().to_string(),
+        // ]
+    }
+
+    fn out_dir(&mut self) {
+        self.next_dir_vec = self.current_dir_vec.clone();
+        self.current_dir_vec = self.previous_dir_vec.clone();
+        self.current_dir_vec.sort();
+        self.previous_dir_vec.sort();
+        self.next_dir_vec.sort();
+        self.pwd.pop();
+        let mut pwd = self.pwd.clone();
+        pwd.pop();
+        self.previous_dir_vec = self.get_files_as_vec(&pwd);
+        self.update_list();
+    }
+
+    fn hover(&mut self) {
+        let mut t = PathBuf::new();
+        t.push(&self.pwd);
+        t.push(&self.current_dir_vec[self.hovered_index as usize]);
+        // let t = Path::new(&self.current_dir_vec[self.hovered_index as usize]);
+        if let Ok(metadata) = t.metadata() {
+            if metadata.is_dir() {
+                self.next_dir_vec = self.get_files_as_vec(&t);
+            } else {
+                //TODO IMPLEMENT FILE PREVIEW
+            }
+        }
     }
 }
 
@@ -238,8 +297,9 @@ fn main() -> Result<(), io::Error> {
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
     //     app.selected_item = thing.to_string();
-
+    app.update_list();
     loop {
+        app.hover();
         terminal.draw(|f| ui(f, &mut app))?;
         if let Event::Key(key) = event::read()? {
             match key.code {
@@ -247,10 +307,19 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                     return Ok(());
                 }
                 KeyCode::Down => app.next(),
-                KeyCode::Char('j') => app.next(),
+                KeyCode::Char('j') => {
+                    app.current_dir_list.next();
+                    app.next();
+                    app.hover();
+                }
                 KeyCode::Up => app.previous(),
-                KeyCode::Char('k') => app.previous(),
+                KeyCode::Char('k') => {
+                    app.current_dir_list.previous();
+                    app.previous();
+                    app.hover();
+                }
                 KeyCode::Char('l') => app.into_dir(),
+                KeyCode::Char('h') => app.out_dir(),
                 _ => {}
             }
         }
@@ -308,21 +377,35 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(prev_block, chunks[0]);
 
-    let mut items: Vec<ListItem> = Vec::new();
-    for file_name in app.current_dir_vec.clone() {
-        let file_is_hidden = match file_name.chars().next() {
-            Some('.') => true,
-            Some(_) => false,
-            None => false,
-        };
-        if !file_is_hidden || app.show_hidden {
-            items.push(ListItem::new(file_name))
-        }
-    }
+    let items = app.current_dir_list.items.to_owned();
     let main_block = List::new(items)
         .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::ALL));
-    f.render_widget(main_block, chunks[1]);
+        .block(Block::default().borders(Borders::ALL))
+        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+        .highlight_symbol(">> ");
+    f.render_stateful_widget(main_block, chunks[1], &mut app.current_dir_list.state);
+
+    // let items = app.current_dir_list.items.to_owned();
+    // let mut items: Vec<ListItem> = Vec::new();
+    // for file_name in app.current_dir_vec.clone() {
+    //     items.push(ListItem::new(file_name));
+    // }
+    //
+    // let mut items: Vec<ListItem> = Vec::new();
+    // for file_name in app.current_dir_vec.clone() {
+    //     let file_is_hidden = match file_name.chars().next() {
+    //         Some('.') => true,
+    //         Some(_) => false,
+    //         None => false,
+    //     };
+    //     if !file_is_hidden || app.show_hidden {
+    //         items.push(ListItem::new(file_name))
+    //     }
+    // }
+    // let main_block = List::new(items)
+    //     .style(Style::default().fg(Color::White))
+    //     .block(Block::default().borders(Borders::ALL));
+    // f.render_widget(main_block, chunks[1]);
 
     let mut items: Vec<ListItem> = Vec::new();
     for file_name in app.next_dir_vec.clone() {
@@ -347,3 +430,4 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 // TODO System Calls... delete copy paste rename ..
 // TODO Split this file into multiple files
 // TODO only show shown items in current_dir
+//
