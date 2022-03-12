@@ -346,5 +346,3 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 // TODO System Calls... delete copy paste rename ..
 // TODO Split this file into multiple files
 // TODO only show shown items in current_dir
-//  Create new vec?
-//Handle scrolling first
