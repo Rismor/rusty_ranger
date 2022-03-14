@@ -1,30 +1,23 @@
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-#![allow(clippy::derivable_impls)]
 #![allow(deprecated)]
-// #![allow(dead_code)]
+
 use clap::Parser;
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
-use crossterm::execute;
-use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+use crossterm::{
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::fs::{self, metadata, DirEntry};
-use std::io;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-use std::{env, thread};
-use tui::backend::CrosstermBackend;
-use tui::layout::Rect;
-use tui::style::{Color, Modifier, Style};
-use tui::symbols::line::THICK_CROSS;
-use tui::widgets::{List, ListItem, ListState, Sparkline};
-use tui::Terminal;
+
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
+
 use tui::{
-    backend::Backend,
+    backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders},
-    Frame,
+    style::{Color, Style},
+    widgets::{Block, Borders, List, ListItem, ListState},
+    Frame, Terminal,
 };
 
 use dirs;
@@ -58,7 +51,6 @@ impl<T> StatefulList<T> {
     fn next(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
-                // Wrap to beginning of list
                 if i >= self.items.len() - 1 {
                     0
                 } else {
@@ -73,7 +65,6 @@ impl<T> StatefulList<T> {
     fn previous(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
-                // Wrap to end of list
                 if i == 0 {
                     self.items.len() - 1
                 } else {
@@ -84,11 +75,8 @@ impl<T> StatefulList<T> {
         };
         self.state.select(Some(i));
     }
-
-    fn unselect(&mut self) {
-        self.state.select(None);
-    }
 }
+
 struct App<'a> {
     /// Basic items.
     show_hidden: bool,
@@ -201,10 +189,6 @@ impl App<'_> {
         self.previous_dir_vec.sort();
         self.next_dir_vec.sort();
         self.update_list();
-        // self.next_dir_vec = vec![
-        //     self.pwd.to_str().unwrap().to_string(),
-        //     pp.to_str().unwrap().to_string(),
-        // ]
     }
 
     fn out_dir(&mut self) {
@@ -236,13 +220,14 @@ impl App<'_> {
         let mut t = PathBuf::new();
         t.push(&self.pwd);
         t.push(&self.current_dir_vec[self.hovered_index as usize]);
-        // let t = Path::new(&self.current_dir_vec[self.hovered_index as usize]);
         if let Ok(metadata) = t.metadata() {
             if metadata.is_dir() {
                 self.next_dir_vec = self.get_files_as_vec(&t);
             } else {
                 self.next_dir_vec = Vec::new();
-                //TODO IMPLEMENT FILE PREVIEW
+
+                let data = fs::read_to_string(t).unwrap_or("Error Loading File".to_string());
+                self.next_dir_vec.push(data);
             }
         }
     }
@@ -253,7 +238,7 @@ fn main() -> Result<(), io::Error> {
     let args = Args::parse();
 
     let custom_dir = match args.filename.clone() {
-        Some(p) => true,
+        Some(_) => true,
         None => false,
     };
     if custom_dir {
@@ -263,11 +248,6 @@ fn main() -> Result<(), io::Error> {
     }
     app.show_hidden = args.show_hidden;
 
-    // let child_dir = Path::new(&app.current_dir_vec[0]);
-
-    //     Some(p) => p,
-    //     None => Path::new("/"),
-    // };
     let pwd = app.pwd.clone();
 
     app.current_dir_vec = app.get_files_as_vec(&pwd);
@@ -320,7 +300,6 @@ fn main() -> Result<(), io::Error> {
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
-    //     app.selected_item = thing.to_string();
     app.update_list();
     loop {
         app.hover();
@@ -334,13 +313,11 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                 KeyCode::Char('j') => {
                     app.current_dir_list.next();
                     app.next();
-                    app.hover();
                 }
                 KeyCode::Up => app.previous(),
                 KeyCode::Char('k') => {
                     app.current_dir_list.previous();
                     app.previous();
-                    app.hover();
                 }
                 KeyCode::Char('l') => {
                     let mut pp = app.pwd.clone();
@@ -381,7 +358,6 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
 fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        // .margin(0)
         .vertical_margin(1)
         .constraints(
             [
@@ -408,7 +384,6 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let title_block = Block::default()
         .title(app.pwd.display().to_string())
-        // .borders(Borders::BOTTOM)
         .title_style(Style::default().fg(Color::Cyan));
 
     f.render_widget(title_block, title_layout[0]);
@@ -437,28 +412,6 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .highlight_symbol(">> ");
     f.render_stateful_widget(main_block, chunks[1], &mut app.current_dir_list.state);
 
-    // let items = app.current_dir_list.items.to_owned();
-    // let mut items: Vec<ListItem> = Vec::new();
-    // for file_name in app.current_dir_vec.clone() {
-    //     items.push(ListItem::new(file_name));
-    // }
-    //
-    // let mut items: Vec<ListItem> = Vec::new();
-    // for file_name in app.current_dir_vec.clone() {
-    //     let file_is_hidden = match file_name.chars().next() {
-    //         Some('.') => true,
-    //         Some(_) => false,
-    //         None => false,
-    //     };
-    //     if !file_is_hidden || app.show_hidden {
-    //         items.push(ListItem::new(file_name))
-    //     }
-    // }
-    // let main_block = List::new(items)
-    //     .style(Style::default().fg(Color::White))
-    //     .block(Block::default().borders(Borders::ALL));
-    // f.render_widget(main_block, chunks[1]);
-
     let mut items: Vec<ListItem> = Vec::new();
     for file_name in app.next_dir_vec.clone() {
         let file_is_hidden = match file_name.chars().next() {
@@ -476,6 +429,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(next_block, chunks[2]);
 }
 
+// TODO Wrap seperate windows in TOKIO async
 // TODO System Calls... delete copy paste rename ..
 // TODO Add file metadata to bottom drwxr-xr-x and bunch more stuff
 // TODO Split this file into multiple files
