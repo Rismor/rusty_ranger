@@ -1,31 +1,22 @@
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-#![allow(clippy::derivable_impls)]
 #![allow(deprecated)]
-// #![allow(dead_code)]
 use clap::Parser;
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
-use crossterm::execute;
-use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+use crossterm::{
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::fs::read_to_string;
-use std::fs::{self, metadata, DirEntry};
-use std::io;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-use std::{env, thread};
-use tui::backend::CrosstermBackend;
-use tui::layout::Rect;
-use tui::style::{Color, Modifier, Style};
-use tui::symbols::line::THICK_CROSS;
-use tui::widgets::{List, ListItem, ListState, Sparkline};
-use tui::Terminal;
+
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
+
 use tui::{
-    backend::Backend,
+    backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders},
-    Frame,
+    style::{Color, Style},
+    widgets::{Block, Borders, List, ListItem, ListState},
+    Frame, Terminal,
 };
 
 use dirs;
@@ -84,10 +75,6 @@ impl<T> StatefulList<T> {
             None => 0,
         };
         self.state.select(Some(i));
-    }
-
-    fn unselect(&mut self) {
-        self.state.select(None);
     }
 }
 struct App<'a> {
@@ -246,7 +233,6 @@ impl App<'_> {
 
                 let data = fs::read_to_string(t).unwrap_or("Error Loading File".to_string());
                 self.next_dir_vec.push(data);
-                //TODO IMPLEMENT FILE PREVIEW
             }
         }
     }
@@ -257,7 +243,7 @@ fn main() -> Result<(), io::Error> {
     let args = Args::parse();
 
     let custom_dir = match args.filename.clone() {
-        Some(p) => true,
+        Some(_) => true,
         None => false,
     };
     if custom_dir {
@@ -338,13 +324,13 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                 KeyCode::Char('j') => {
                     app.current_dir_list.next();
                     app.next();
-                    app.hover();
+                    // app.hover();
                 }
                 KeyCode::Up => app.previous(),
                 KeyCode::Char('k') => {
                     app.current_dir_list.previous();
                     app.previous();
-                    app.hover();
+                    // app.hover();
                 }
                 KeyCode::Char('l') => {
                     let mut pp = app.pwd.clone();
@@ -480,6 +466,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(next_block, chunks[2]);
 }
 
+// TODO Wrap seperate windows in TOKIO async
 // TODO System Calls... delete copy paste rename ..
 // TODO Add file metadata to bottom drwxr-xr-x and bunch more stuff
 // TODO Split this file into multiple files
