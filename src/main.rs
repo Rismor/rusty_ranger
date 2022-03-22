@@ -428,8 +428,3 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(next_block, chunks[2]);
 }
-
-// TODO Wrap seperate windows in TOKIO async
-// TODO System Calls... delete copy paste rename ..
-// TODO Add file metadata to bottom drwxr-xr-x and bunch more stuff
-// TODO Split this file into multiple files
