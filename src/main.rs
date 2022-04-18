@@ -126,6 +126,7 @@ impl App<'_> {
             self.current_dir_list.state.select(Some(0));
         }
     }
+
     fn get_files_as_vec(&mut self, pwd: &Path) -> Vec<String> {
         let mut result: Vec<String> = Vec::new();
         if let Ok(entries) = fs::read_dir(pwd) {
@@ -235,7 +236,6 @@ impl App<'_> {
 
 fn main() -> Result<(), io::Error> {
     let mut app = App::default();
-    //test
     let args = Args::parse();
 
     let custom_dir = match args.filename.clone() {
@@ -310,35 +310,17 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                 KeyCode::Char('q') => {
                     return Ok(());
                 }
-                KeyCode::Down => app.next(),
-                KeyCode::Char('j') => {
-                    app.current_dir_list.next();
-                    app.next();
-                }
-                KeyCode::Up => app.previous(),
-                KeyCode::Char('k') => {
-                    app.current_dir_list.previous();
-                    app.previous();
-                }
-                KeyCode::Char('l') => {
-                    let mut pp = app.pwd.clone();
-                    pp.push(Path::new(&app.current_dir_vec[app.hovered_index as usize]));
-                    if let Ok(metadata) = pp.metadata() {
-                        if metadata.is_dir() {
-                            app.into_dir();
-                        }
-                    }
-                }
-                KeyCode::Char('h') => {
-                    let p = match app.pwd.parent() {
-                        Some(_) => true,
-                        None => false,
-                    };
-                    if p {
-                        app.out_dir();
-                    } else {
-                    }
-                }
+
+                KeyCode::Down => move_up(&mut app),
+                KeyCode::Up => move_down(&mut app),
+                KeyCode::Right => move_in(&mut app),
+                KeyCode::Left => move_out(&mut app),
+
+                KeyCode::Char('j') => move_up(&mut app),
+                KeyCode::Char('k') => move_down(&mut app),
+                KeyCode::Char('l') => move_in(&mut app),
+                KeyCode::Char('h') => move_out(&mut app),
+
                 KeyCode::Char('s') => {
                     app.show_hidden = !app.show_hidden;
                     let pp = app.pwd.clone();
@@ -428,4 +410,36 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(next_block, chunks[2]);
+}
+
+fn move_down(app: &mut App) {
+    app.previous();
+    app.current_dir_list.previous();
+}
+
+fn move_up(app: &mut App) {
+    app.next();
+    app.current_dir_list.next();
+}
+
+fn move_in(app: &mut App) {
+    let mut pp = app.pwd.clone();
+    pp.push(Path::new(&app.current_dir_vec[app.hovered_index as usize]));
+    if let Ok(metadata) = pp.metadata() {
+        if metadata.is_dir() {
+            app.into_dir();
+        }
+    }
+}
+
+fn move_out(app: &mut App) {
+    let p = match app.pwd.parent() {
+        Some(_) => true,
+        None => false,
+    };
+    if p {
+        app.out_dir();
+    } else {
+        return;
+    }
 }
